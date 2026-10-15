@@ -1,0 +1,148 @@
+/* QuickMD Typography — 整洁、自动间距、易读 */
+:root {
+  --bg: #ffffff;
+  --fg: #1d1d1f;
+  --muted: #6e6e73;
+  --border: #e5e5ea;
+  --code-bg: #f5f5f7;
+  --code-fg: #1d1d1f;
+  --pre-bg: #f5f5f7;
+  --link: #0b6bff;
+  --quote-border: #0b6bff;
+  --table-stripe: #f9f9fb;
+  --h-border: #e5e5ea;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1e;
+    --fg: #e8e8ea;
+    --muted: #9a9aa0;
+    --border: #38383a;
+    --code-bg: #2d2d30;
+    --code-fg: #e8e8ea;
+    --pre-bg: #2d2d30;
+    --link: #5aa2ff;
+    --quote-border: #5aa2ff;
+    --table-stripe: #262628;
+    --h-border: #38383a;
+  }
+}
+html[data-theme="light"] {
+  --bg: #ffffff; --fg: #1d1d1f; --muted: #6e6e73; --border: #e5e5ea;
+  --code-bg: #f5f5f7; --code-fg: #1d1d1f; --pre-bg: #f5f5f7;
+  --link: #0b6bff; --quote-border: #0b6bff; --table-stripe: #f9f9fb; --h-border: #e5e5ea;
+}
+html[data-theme="dark"] {
+  --bg: #1e1e1e; --fg: #e8e8ea; --muted: #9a9aa0; --border: #38383a;
+  --code-bg: #2d2d30; --code-fg: #e8e8ea; --pre-bg: #2d2d30;
+  --link: #5aa2ff; --quote-border: #5aa2ff; --table-stripe: #262628; --h-border: #38383a;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+  -webkit-font-smoothing: antialiased;
+}
+#content {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 48px 44px 120px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+/* 标题：自动间距 + 层级清晰 */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 1.6em 0 0.7em;
+  letter-spacing: -0.01em;
+}
+h1:first-child, h2:first-child, h3:first-child { margin-top: 0; }
+h1 { font-size: 2em; padding-bottom: 0.35em; border-bottom: 1px solid var(--h-border); }
+h2 { font-size: 1.55em; padding-bottom: 0.3em; border-bottom: 1px solid var(--h-border); }
+h3 { font-size: 1.25em; }
+h4 { font-size: 1.05em; }
+h5, h6 { font-size: 0.95em; color: var(--muted); }
+p { margin: 0.85em 0; }
+/* 链接 */
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+/* 列表：舒适间距 */
+ul, ol { margin: 0.85em 0; padding-left: 1.8em; }
+li { margin: 0.35em 0; }
+li > ul, li > ol { margin: 0.35em 0; }
+li.task { list-style: none; margin-left: -1.8em; }
+li.task input { margin-right: 0.5em; }
+/* 引用 */
+blockquote {
+  margin: 1em 0;
+  padding: 0.4em 1em;
+  color: var(--muted);
+  border-left: 4px solid var(--quote-border);
+  background: var(--table-stripe);
+  border-radius: 0 8px 8px 0;
+}
+blockquote p { margin: 0.5em 0; }
+/* 代码 */
+code {
+  font-family: "SF Mono", ui-monospace, Menlo, Consolas, "PingFang SC", monospace;
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: 0.15em 0.45em;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+pre {
+  margin: 1em 0;
+  padding: 16px 18px;
+  background: var(--pre-bg);
+  border-radius: 10px;
+  overflow-x: auto;
+  line-height: 1.6;
+  border: 1px solid var(--border);
+}
+pre code {
+  background: none;
+  padding: 0;
+  white-space: pre;
+  font-size: 0.86em;
+}
+/* 表格 */
+table {
+  width: 100%;
+  margin: 1.1em 0;
+  border-collapse: collapse;
+  font-size: 0.94em;
+  line-height: 1.6;
+  display: block;
+  overflow-x: auto;
+}
+th, td { padding: 9px 14px; border: 1px solid var(--border); text-align: left; }
+th { font-weight: 700; background: var(--table-stripe); white-space: nowrap; }
+tr:nth-child(even) td { background: var(--table-stripe); }
+/* 图片 */
+img { max-width: 100%; height: auto; border-radius: 8px; }
+p img { display: block; margin: 0.5em auto; }
+/* 分隔线 */
+hr { margin: 2em 0; border: none; border-top: 1px solid var(--border); }
+/* 删除线/标记 */
+del { color: var(--muted); }
+mark { background: #fff3b0; border-radius: 3px; padding: 0 0.2em; }
+@media (prefers-color-scheme: dark) { mark { background: #5c4d00; color: #fff; } }
+/* 脚注/上标 */
+sup { line-height: 0; }
+/* 打印/导出：白底黑字 */
+@media print {
+  body { background: #fff; color: #000; font-size: 12pt; line-height: 1.7; }
+  #content { max-width: none; padding: 0; }
+  pre, code { background: #f4f4f4 !important; color: #000 !important; border: 1px solid #ddd; }
+  a { color: #000; text-decoration: underline; }
+  h1, h2 { border-bottom-color: #ccc; }
+}

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<base id="baseTag" href="">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>/*__QUICKMD_CSS__*/</style>
+</head>
+<body>
+<article id="content"></article>
+<script>/*__QUICKMD_MARKED__*/</script>
+<script>
+(function() {
+  if (typeof marked !== 'undefined') {
+    marked.setOptions({ gfm: true, breaks: false, headerIds: false, mangle: false });
+  }
+  // 任务列表样式补丁
+  function patchTasks() {
+    document.querySelectorAll('#content li').forEach(function(li) {
+      var cb = li.querySelector('input[type="checkbox"]');
+      if (cb) { li.classList.add('task'); cb.disabled = true; }
+    });
+  }
+  // base64 -> unicode
+  function b64decode(b64) {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+  // 主渲染入口，返回渲染耗时ms
+  window.__renderMD = function(b64, baseHref) {
+    var t0 = performance.now();
+    try {
+      if (baseHref) document.getElementById('baseTag').setAttribute('href', baseHref);
+      var md = b64decode(b64);
+      var html = (typeof marked !== 'undefined') ? marked.parse(md) : '<pre>' + md.replace(/[<>&]/g, function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}) + '</pre>';
+      document.getElementById('content').innerHTML = html;
+      patchTasks();
+      // 外链新窗口打开（由 Swift 拦截用浏览器打开）
+      document.querySelectorAll('#content a[href]').forEach(function(a) {
+        var h = a.getAttribute('href') || '';
+        if (/^(https?:|mailto:)/i.test(h)) a.setAttribute('target', '_blank');
+      });
+      window.scrollTo(0, 0);
+      return Math.round((performance.now() - t0) * 10) / 10;
+    } catch (e) {
+      document.getElementById('content').innerHTML = '<p style="color:red">渲染失败：' + (e && e.message) + '</p>';
+      return -1;
+    }
+  };
+  window.__setTheme = function(mode) {
+    if (mode === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', mode);
+  };
+  window.__setFontSize = function(px) { document.body.style.fontSize = px + 'px'; };
+  window.__contentHeight = function() {
+    return Math.ceil(document.getElementById('content').getBoundingClientRect().height + 48 + 120);
+  };
+  window.__contentHTML = function() { return document.getElementById('content').innerHTML; };
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
