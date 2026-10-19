@@ -134,41 +134,11 @@ final class MDWindowController: NSWindowController, NSToolbarDelegate, WKNavigat
         win.isReleasedWhenClosed = false
         super.init(window: win)
         win.delegate = self
-        setupMenu()
         setupToolbar(win)
         setupViews(win)
         applyPrefsToWeb()
     }
     required init?(coder: NSCoder) { fatalError() }
-
-    // ---- 菜单（保证快捷键可用） ----
-    func setupMenu() {
-        if NSApp.mainMenu != nil { return }
-        let main = NSMenu()
-        let appItem = NSMenuItem(); main.addItem(appItem)
-        let appMenu = NSMenu(); appItem.submenu = appMenu
-        appMenu.addItem(withTitle: "关于 QuickMD", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
-        appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "退出 QuickMD", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        let fileItem = NSMenuItem(); main.addItem(fileItem)
-        let fileMenu = NSMenu(title: "文件"); fileItem.submenu = fileMenu
-        fileMenu.addItem(withTitle: "打开…", action: #selector(openDocument(_:)), keyEquivalent: "o")
-        fileMenu.addItem(withTitle: "重新载入", action: #selector(reloadFile(_:)), keyEquivalent: "r")
-        fileMenu.addItem(.separator())
-        fileMenu.addItem(withTitle: "导出 PDF…", action: #selector(exportPDF(_:)), keyEquivalent: "e")
-        fileMenu.addItem(withTitle: "导出长图 PNG…", action: #selector(exportPNG(_:)), keyEquivalent: "E")
-        fileMenu.addItem(withTitle: "导出 HTML…", action: #selector(exportHTML(_:)), keyEquivalent: "h")
-        fileMenu.addItem(.separator())
-        fileMenu.addItem(withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
-        let viewItem = NSMenuItem(); main.addItem(viewItem)
-        let viewMenu = NSMenu(title: "显示"); viewItem.submenu = viewMenu
-        viewMenu.addItem(withTitle: "放大字号", action: #selector(fontBigger(_:)), keyEquivalent: "+")
-        viewMenu.addItem(withTitle: "缩小字号", action: #selector(fontSmaller(_:)), keyEquivalent: "-")
-        viewMenu.addItem(withTitle: "默认字号", action: #selector(fontReset(_:)), keyEquivalent: "0")
-        viewMenu.addItem(.separator())
-        viewMenu.addItem(withTitle: "切换主题", action: #selector(toggleTheme(_:)), keyEquivalent: "t")
-        NSApp.mainMenu = main
-    }
 
     // ---- 工具栏 ----
     func setupToolbar(_ win: NSWindow) {
@@ -591,11 +561,155 @@ extension NSToolbarItem.Identifier {
 
 // MARK: - AppDelegate
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func setupMainMenu() {
+        let mainMenu = NSMenu()
+
+        // 1. App 菜单
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+        let appMenu = NSMenu()
+        appMenuItem.submenu = appMenu
+
+        appMenu.addItem(withTitle: "关于 QuickMD", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(NSMenuItem.separator())
+
+        let servicesItem = NSMenuItem(title: "服务", action: nil, keyEquivalent: "")
+        let servicesMenu = NSMenu(title: "服务")
+        servicesItem.submenu = servicesMenu
+        appMenu.addItem(servicesItem)
+        NSApp.servicesMenu = servicesMenu
+
+        appMenu.addItem(NSMenuItem.separator())
+        appMenu.addItem(withTitle: "隐藏 QuickMD", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideOthers = NSMenuItem(title: "隐藏其他", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        hideOthers.keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(hideOthers)
+        appMenu.addItem(withTitle: "显示全部", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(NSMenuItem.separator())
+        appMenu.addItem(withTitle: "退出 QuickMD", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+
+        // 2. 文件菜单
+        let fileMenuItem = NSMenuItem()
+        mainMenu.addItem(fileMenuItem)
+        let fileMenu = NSMenu(title: "文件")
+        fileMenuItem.submenu = fileMenu
+
+        fileMenu.addItem(withTitle: "新建窗口", action: #selector(menuNewWindow(_:)), keyEquivalent: "n")
+        fileMenu.addItem(withTitle: "打开…", action: #selector(menuOpenDocument(_:)), keyEquivalent: "o")
+        fileMenu.addItem(withTitle: "重新载入", action: #selector(menuReloadFile(_:)), keyEquivalent: "r")
+        fileMenu.addItem(NSMenuItem.separator())
+        fileMenu.addItem(withTitle: "导出 PDF…", action: #selector(menuExportPDF(_:)), keyEquivalent: "e")
+        let expPngItem = NSMenuItem(title: "导出长图 PNG…", action: #selector(menuExportPNG(_:)), keyEquivalent: "E")
+        expPngItem.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(expPngItem)
+        fileMenu.addItem(withTitle: "导出 HTML…", action: #selector(menuExportHTML(_:)), keyEquivalent: "")
+        fileMenu.addItem(NSMenuItem.separator())
+        fileMenu.addItem(withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+
+        // 3. 编辑菜单（支持 ⌘C / ⌘V / ⌘A 等标准文本操作）
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: "编辑")
+        editMenuItem.submenu = editMenu
+        editMenu.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
+        let redoItem = NSMenuItem(title: "重做", action: Selector(("redo:")), keyEquivalent: "Z")
+        redoItem.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(redoItem)
+        editMenu.addItem(NSMenuItem.separator())
+        editMenu.addItem(withTitle: "剪切", action: Selector(("cut:")), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "拷贝", action: Selector(("copy:")), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "粘贴", action: Selector(("paste:")), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "全选", action: Selector(("selectAll:")), keyEquivalent: "a")
+
+        // 4. 显示菜单
+        let viewMenuItem = NSMenuItem()
+        mainMenu.addItem(viewMenuItem)
+        let viewMenu = NSMenu(title: "显示")
+        viewMenuItem.submenu = viewMenu
+        let bigger = NSMenuItem(title: "放大字号", action: #selector(menuFontBigger(_:)), keyEquivalent: "=")
+        bigger.keyEquivalentModifierMask = [.command]
+        viewMenu.addItem(bigger)
+        viewMenu.addItem(withTitle: "缩小字号", action: #selector(menuFontSmaller(_:)), keyEquivalent: "-")
+        viewMenu.addItem(withTitle: "默认字号", action: #selector(menuFontReset(_:)), keyEquivalent: "0")
+        viewMenu.addItem(NSMenuItem.separator())
+        viewMenu.addItem(withTitle: "切换主题", action: #selector(menuToggleTheme(_:)), keyEquivalent: "t")
+
+        // 5. 窗口菜单
+        let windowMenuItem = NSMenuItem()
+        mainMenu.addItem(windowMenuItem)
+        let windowMenu = NSMenu(title: "窗口")
+        windowMenuItem.submenu = windowMenu
+        windowMenu.addItem(withTitle: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: "缩放", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowMenu.addItem(NSMenuItem.separator())
+        windowMenu.addItem(withTitle: "前置全部窗口", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+        NSApp.windowsMenu = windowMenu
+
+        NSApp.mainMenu = mainMenu
+    }
+
+    var keyWindowController: MDWindowController? {
+        if let keyWin = NSApp.keyWindow, let c = keyWin.windowController as? MDWindowController {
+            return c
+        }
+        for c in controllers {
+            if c.window?.isKeyWindow ?? false { return c }
+        }
+        return controllers.last
+    }
+
+    @objc func menuNewWindow(_ sender: Any?) {
+        newWindow().showWindow(nil)
+    }
+
+    @objc func menuOpenDocument(_ sender: Any?) {
+        if let c = keyWindowController {
+            c.openDocument(sender)
+        } else {
+            let c = newWindow()
+            c.showWindow(nil)
+            c.openDocument(sender)
+        }
+    }
+
+    @objc func menuReloadFile(_ sender: Any?) {
+        keyWindowController?.reloadFile(sender)
+    }
+
+    @objc func menuExportPDF(_ sender: Any?) {
+        keyWindowController?.exportPDF(sender)
+    }
+
+    @objc func menuExportPNG(_ sender: Any?) {
+        keyWindowController?.exportPNG(sender)
+    }
+
+    @objc func menuExportHTML(_ sender: Any?) {
+        keyWindowController?.exportHTML(sender)
+    }
+
+    @objc func menuFontBigger(_ sender: Any?) {
+        keyWindowController?.fontBigger(sender)
+    }
+
+    @objc func menuFontSmaller(_ sender: Any?) {
+        keyWindowController?.fontSmaller(sender)
+    }
+
+    @objc func menuFontReset(_ sender: Any?) {
+        keyWindowController?.fontReset(sender)
+    }
+
+    @objc func menuToggleTheme(_ sender: Any?) {
+        keyWindowController?.toggleTheme(sender)
+    }
+
     var controllers: [MDWindowController] = []
     var pendingPaths: [String] = []
     var didLaunch = false
 
     func applicationDidFinishLaunching(_ n: Notification) {
+        setupMainMenu()
         didLaunch = true
         // 命令行参数（open xxx.md / 拖到 Dock 图标）
         let args = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") && FileManager.default.fileExists(atPath: $0) }
