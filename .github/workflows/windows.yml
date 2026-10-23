@@ -1,0 +1,57 @@
+name: Windows Build
+
+# push 到 main：只构建（artifact 试用）；打 win-v* 标签：构建 + 发 Release
+permissions:
+  contents: write
+
+on:
+  push:
+    branches: [main]
+    tags: ['win-v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish (release tag)
+        if: startsWith(github.ref, 'refs/tags/win-v')
+        run: |
+          $v = "${{ github.ref_name }}".Replace("win-v", "")
+          dotnet publish QuickMD-Windows/QuickMD.csproj -c Release -o publish /p:Version=$v
+
+      - name: Publish (dev build)
+        if: "!startsWith(github.ref, 'refs/tags/win-v')"
+        run: dotnet publish QuickMD-Windows/QuickMD.csproj -c Release -o publish
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuickMD-win-x64
+          path: publish/QuickMD.exe
+
+      - name: Zip portable
+        if: startsWith(github.ref, 'refs/tags/win-v')
+        run: Compress-Archive -Path publish/QuickMD.exe -DestinationPath QuickMD-win-x64.zip
+
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/win-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            publish/QuickMD.exe
+            QuickMD-win-x64.zip
+          generate_release_notes: true
