@@ -356,7 +356,15 @@ sealed class MainForm : Form
         {
             _status.Text = "正在生成 PDF…";
             var settings = core.Environment.CreatePrintSettings();
+            settings.Orientation = CoreWebView2PrintOrientation.Portrait;
+            settings.PageWidth = 8.27;   // A4（英寸）
+            settings.PageHeight = 11.69;
+            settings.MarginTop = 0.4;    // 窄边距 ~10mm
+            settings.MarginBottom = 0.4;
+            settings.MarginLeft = 0.4;
+            settings.MarginRight = 0.4;
             settings.ShouldPrintBackgrounds = true;
+            settings.ShouldPrintHeaderAndFooter = false;
             await core.PrintToPdfAsync(dlg.FileName, settings);
             long len = new FileInfo(dlg.FileName).Length;
             _status.Text = $"已导出 PDF：{Path.GetFileName(dlg.FileName)} ({Utils.FormatBytes((int)Math.Min(len, int.MaxValue))})";

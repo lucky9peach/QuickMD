@@ -430,12 +430,28 @@ final class MDWindowController: NSWindowController, NSToolbarDelegate, WKNavigat
         panel.nameFieldStringValue = defaultExportName("pdf")
         panel.allowedFileTypes = ["pdf"]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        webView.createPDF { [weak self] result in
-            switch result {
-            case .success(let data):
-                do { try data.write(to: url); self?.statusLabel.stringValue = "已导出 PDF：\(url.lastPathComponent) (\(formatBytes(data.count)))" }
-                catch { self?.toast("PDF 写入失败：\(error.localizedDescription)") }
-            case .failure(let e): self?.toast("PDF 生成失败：\(e.localizedDescription)")
+        // A4 真分页：createPDF 只产单张长页，这里走打印管线存 PDF
+        let pi = (NSPrintInfo.shared.copy() as? NSPrintInfo) ?? NSPrintInfo()
+        pi.paperSize = NSSize(width: 595.28, height: 841.89) // A4
+        pi.orientation = .portrait
+        pi.topMargin = 28.35; pi.bottomMargin = 28.35        // 窄边距 10mm
+        pi.leftMargin = 28.35; pi.rightMargin = 28.35
+        pi.horizontalPagination = .fit
+        pi.verticalPagination = .automatic
+        pi.jobDisposition = .save
+        pi.dictionary().setObject(url as NSURL, forKey: "NSPrintJobSavingURL" as NSString)
+        let op = webView.printOperation(with: pi)
+        op.showsPrintPanel = false
+        op.showsProgressPanel = false
+        statusLabel.stringValue = "正在生成 PDF…"
+        // run() 同步执行，放下一轮 runloop 先让状态条刷新
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if op.run(), let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+               let size = attrs[.size] as? Int {
+                self.statusLabel.stringValue = "已导出 PDF：\(url.lastPathComponent) (\(formatBytes(size)))"
+            } else {
+                self.statusLabel.stringValue = "PDF 生成失败或已取消"
             }
         }
     }

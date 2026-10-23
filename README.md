@@ -14,7 +14,7 @@ No Electron, no bloat. Export to PDF / ultra-long PNG / standalone HTML.
 - **Instant open** — pre-warmed render engine; opening a file is a single JS call (~10–20ms)
 - **Clean typography** — 16px body, 1.8 line-height, auto spacing for headings/paragraphs/lists
 - **Full GFM** — tables, code blocks, task lists, blockquotes (powered by [marked](https://github.com/markedjs/marked))
-- **Export** — paginated PDF (`⌘E`), ultra-long PNG with auto-stitching (`⇧⌘E`), standalone HTML (`⌘H`)
+- **Export** — A4 paginated PDF with narrow margins (`⌘E`), ultra-long PNG with auto-stitching (`⇧⌘E`), standalone HTML (`⌘H`)
 - **Live reload** — auto re-renders when the file changes on disk
 - **Multi-window** — each file in its own window; drag & drop supported
 - **Themes** — follows system, or force light/dark (`⌘T`); adjustable font size (`⌘+`/`⌘-`/`⌘0`)
