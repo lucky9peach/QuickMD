@@ -10,6 +10,7 @@ static class Program
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance); // GB18030 / Win1252
         ApplicationConfiguration.Initialize();
+        _ = Task.Run(() => Prefs.PruneMissing()); // 后台清理已删除文件的历史，不阻塞启动
         string[] files = args.Where(a => !a.StartsWith("-") && File.Exists(a)).ToArray();
         Application.Run(new MultiWindowContext(files));
     }

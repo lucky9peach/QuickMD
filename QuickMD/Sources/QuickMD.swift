@@ -58,6 +58,44 @@ enum Prefs {
     }
 }
 
+// MARK: - 历史记录（UserDefaults 常驻内存读零开销；存在性过滤只在用时做，清理放后台）
+enum RecentFiles {
+    static let key = "recentFiles"
+    static let maxCount = 12
+    static func list() -> [String] {
+        return UserDefaults.standard.stringArray(forKey: key) ?? []
+    }
+    static func add(_ path: String) {
+        var arr = list()
+        arr.removeAll { $0 == path }
+        arr.insert(path, at: 0)
+        if arr.count > maxCount { arr = Array(arr.prefix(maxCount)) }
+        UserDefaults.standard.set(arr, forKey: key)
+    }
+    static func remove(_ path: String) {
+        var arr = list()
+        arr.removeAll { $0 == path }
+        UserDefaults.standard.set(arr, forKey: key)
+    }
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+    static func existing(limit: Int = 12) -> [String] {
+        let fm = FileManager.default
+        return Array(list().filter { fm.fileExists(atPath: $0) }.prefix(limit))
+    }
+    static func pruneMissingAsync() {
+        DispatchQueue.global(qos: .utility).async {
+            let fm = FileManager.default
+            let cur = list()
+            let kept = cur.filter { fm.fileExists(atPath: $0) }
+            if kept.count != cur.count {
+                DispatchQueue.main.async { UserDefaults.standard.set(kept, forKey: key) }
+            }
+        }
+    }
+}
+
 // MARK: - 文件读取（多编码兜底）
 func readTextFile(_ path: String) -> (String, Int)? {
     guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
@@ -116,6 +154,7 @@ final class MDWindowController: NSWindowController, NSToolbarDelegate, WKNavigat
     var statusLabel: NSTextField!
     var emptyView: NSView!
     var filePath: String?
+    var recentPaths: [String] = []
     var webReady = false
     var pendingMD: (b64: String, base: String, path: String, bytes: Int, text: String)?
     var watchSource: DispatchSourceFileSystemObject?
@@ -266,7 +305,32 @@ final class MDWindowController: NSWindowController, NSToolbarDelegate, WKNavigat
         let btn = NSButton(title: "打开文件…", target: self, action: #selector(openDocument(_:)))
         btn.bezelStyle = .rounded
         btn.font = .systemFont(ofSize: 14)
-        let stack = NSStackView(views: [icon, t1, t2, btn])
+        var views: [NSView] = [icon, t1, t2, btn]
+        // 最近打开：窗口创建时读一次（内存读 + 最多几次 stat，不影响启动）
+        recentPaths = RecentFiles.existing(limit: 5)
+        if !recentPaths.isEmpty {
+            let recentStack = NSStackView()
+            recentStack.orientation = .vertical
+            recentStack.alignment = .centerX
+            recentStack.spacing = 4
+            let rh = NSTextField(labelWithString: "— 最近打开 —")
+            rh.font = .systemFont(ofSize: 12)
+            rh.textColor = .secondaryLabelColor
+            rh.alignment = .center
+            recentStack.addArrangedSubview(rh)
+            for (i, p) in recentPaths.enumerated() {
+                let b = NSButton(title: "\((p as NSString).lastPathComponent)", target: self, action: #selector(openRecentFile(_:)))
+                b.tag = i
+                b.toolTip = p
+                b.isBordered = false
+                b.contentTintColor = .linkColor
+                b.font = .systemFont(ofSize: 13)
+                (b.cell as? NSButtonCell)?.lineBreakMode = .byTruncatingMiddle
+                recentStack.addArrangedSubview(b)
+            }
+            views.append(recentStack)
+        }
+        let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 14
@@ -279,6 +343,18 @@ final class MDWindowController: NSWindowController, NSToolbarDelegate, WKNavigat
             stack.centerYAnchor.constraint(equalTo: v.centerYAnchor),
         ])
         return v
+    }
+
+    @objc func openRecentFile(_ sender: NSButton) {
+        guard sender.tag < recentPaths.count else { return }
+        let p = recentPaths[sender.tag]
+        if FileManager.default.fileExists(atPath: p) { openFile(p) }
+        else {
+            RecentFiles.remove(p)
+            recentPaths.remove(at: sender.tag)
+            sender.isHidden = true
+            statusLabel.stringValue = "文件已不存在，已从历史移除"
+        }
     }
 
     // ---- WK 代理：外链用浏览器打开 ----
@@ -328,6 +404,7 @@ final class MDWindowController: NSWindowController, NSToolbarDelegate, WKNavigat
                 self.window?.title = (path as NSString).lastPathComponent
                 self.window?.subtitle = (path as NSString).deletingLastPathComponent
                 NSDocumentController.shared.noteNewRecentDocumentURL(URL(fileURLWithPath: path))
+                RecentFiles.add(path)
                 self.startWatching(path)
                 let payload = (b64: b64, base: base, path: path, bytes: bytes, text: text)
                 if self.webReady { self.renderPending(payload, readMS: readMS, words: words) }
@@ -576,7 +653,8 @@ extension NSToolbarItem.Identifier {
 }
 
 // MARK: - AppDelegate
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+    var recentMenu: NSMenu?
     func setupMainMenu() {
         let mainMenu = NSMenu()
 
@@ -612,6 +690,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         fileMenu.addItem(withTitle: "新建窗口", action: #selector(menuNewWindow(_:)), keyEquivalent: "n")
         fileMenu.addItem(withTitle: "打开…", action: #selector(menuOpenDocument(_:)), keyEquivalent: "o")
+        let recentItem = NSMenuItem(title: "打开最近的文件", action: nil, keyEquivalent: "")
+        let rm = NSMenu(title: "打开最近的文件")
+        rm.delegate = self
+        recentItem.submenu = rm
+        fileMenu.addItem(recentItem)
+        recentMenu = rm
         fileMenu.addItem(withTitle: "重新载入", action: #selector(menuReloadFile(_:)), keyEquivalent: "r")
         fileMenu.addItem(NSMenuItem.separator())
         fileMenu.addItem(withTitle: "导出 PDF…", action: #selector(menuExportPDF(_:)), keyEquivalent: "e")
@@ -688,6 +772,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // ---- 历史菜单：每次展开时现查（内存读 + stat，不走启动路径） ----
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu == recentMenu else { return }
+        menu.removeAllItems()
+        let paths = RecentFiles.existing()
+        if paths.isEmpty {
+            let none = NSMenuItem(title: "（暂无）", action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            menu.addItem(none)
+        } else {
+            for p in paths {
+                let it = NSMenuItem(title: (p as NSString).lastPathComponent, action: #selector(menuOpenRecent(_:)), keyEquivalent: "")
+                it.toolTip = p
+                it.representedObject = p
+                it.target = self
+                menu.addItem(it)
+            }
+            menu.addItem(NSMenuItem.separator())
+            let c = NSMenuItem(title: "清除历史记录", action: #selector(menuClearRecent(_:)), keyEquivalent: "")
+            c.target = self
+            menu.addItem(c)
+        }
+    }
+
+    @objc func menuOpenRecent(_ sender: NSMenuItem) {
+        guard let path = sender.representedObject as? String else { return }
+        if FileManager.default.fileExists(atPath: path) { openFiles([path]) }
+        else { RecentFiles.remove(path) }
+    }
+
+    @objc func menuClearRecent(_ sender: Any?) { RecentFiles.clear() }
+
     @objc func menuReloadFile(_ sender: Any?) {
         keyWindowController?.reloadFile(sender)
     }
@@ -726,6 +842,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         setupMainMenu()
+        RecentFiles.pruneMissingAsync() // 后台清理已删除文件的历史，不阻塞启动
         didLaunch = true
         // 命令行参数（open xxx.md / 拖到 Dock 图标）
         let args = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") && FileManager.default.fileExists(atPath: $0) }

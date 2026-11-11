@@ -86,6 +86,9 @@ sealed class MainForm : Form
         var file = new ToolStripMenuItem("文件(&F)");
         file.DropDownItems.Add(new ToolStripMenuItem("新建窗口", null, (_, _) => Program.NewWindow(), Keys.Control | Keys.N));
         file.DropDownItems.Add(new ToolStripMenuItem("打开(&O)…", null, (_, _) => OpenDialog(), Keys.Control | Keys.O));
+        var recent = new ToolStripMenuItem("最近打开(&R)");
+        recent.DropDownOpening += (_, _) => RebuildRecentMenu(recent);
+        file.DropDownItems.Add(recent);
         file.DropDownItems.Add(new ToolStripMenuItem("重新载入", null, (_, _) => Reload(), Keys.Control | Keys.R));
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(new ToolStripMenuItem("导出 PDF…", null, (_, _) => ExportPdf(), Keys.Control | Keys.E));
@@ -160,6 +163,22 @@ sealed class MainForm : Form
         box.Controls.Add(t1);
         box.Controls.Add(t2);
         box.Controls.Add(btn);
+        // 最近打开：窗口创建时读一次（内存读 + 最多几次 Exists，不影响启动）
+        var tip = new ToolTip();
+        foreach (string p in Prefs.GetRecent(5).Where(File.Exists).ToList())
+        {
+            string path = p;
+            if (box.Controls.Count == 4)
+                box.Controls.Add(new Label { Text = "— 最近打开 —", Font = new Font("Microsoft YaHei UI", 9), ForeColor = SystemColors.GrayText, AutoSize = true, Anchor = AnchorStyles.None, TextAlign = ContentAlignment.MiddleCenter, Margin = new Padding(0, 10, 0, 2) });
+            var link = new LinkLabel { Text = Path.GetFileName(path), AutoSize = true, Anchor = AnchorStyles.None, MaximumSize = new Size(420, 0), AutoEllipsis = true, Margin = new Padding(0, 1, 0, 1) };
+            tip.SetToolTip(link, path);
+            link.LinkClicked += (_, _) =>
+            {
+                if (File.Exists(path)) OpenFile(path);
+                else { Prefs.RemoveRecent(path); link.Enabled = false; _status.Text = "文件已不存在，已从历史移除"; }
+            };
+            box.Controls.Add(link);
+        }
         grid.Controls.Add(box, 1, 1);
         _empty.Controls.Add(grid);
     }
@@ -221,6 +240,7 @@ sealed class MainForm : Form
         double readMs = (DateTime.UtcNow - t0).TotalMilliseconds;
 
         _filePath = path;
+        _ = Task.Run(() => Prefs.AddRecent(path)); // 后台记历史，不卡 UI
         _empty.Visible = false;
         Text = Path.GetFileName(path) + " — QuickMD";
         StartWatching(path);
@@ -289,6 +309,38 @@ sealed class MainForm : Form
     }
 
     // ---- 菜单/工具栏动作 ----
+    // ---- 历史菜单：每次展开时现查（内存读 + Exists，不走启动路径） ----
+    void RebuildRecentMenu(ToolStripMenuItem recent)
+    {
+        recent.DropDownItems.Clear();
+        var list = Prefs.GetRecent().Where(File.Exists).ToList();
+        if (list.Count == 0)
+        {
+            recent.DropDownItems.Add(new ToolStripMenuItem("（暂无）") { Enabled = false });
+        }
+        else
+        {
+            foreach (string p in list)
+            {
+                string path = p;
+                var it = new ToolStripMenuItem(Path.GetFileName(path)) { ToolTipText = path };
+                it.Click += (_, _) => OpenRecent(path);
+                recent.DropDownItems.Add(it);
+            }
+            recent.DropDownItems.Add(new ToolStripSeparator());
+            var c = new ToolStripMenuItem("清除历史记录");
+            c.Click += (_, _) => Prefs.ClearRecent();
+            recent.DropDownItems.Add(c);
+        }
+    }
+
+    void OpenRecent(string path)
+    {
+        if (!File.Exists(path)) { Prefs.RemoveRecent(path); _status.Text = "文件已不存在，已从历史移除"; return; }
+        if (_filePath == null) OpenFile(path);
+        else Program.OpenFiles(new[] { path });
+    }
+
     void OpenDialog()
     {
         using var dlg = new OpenFileDialog

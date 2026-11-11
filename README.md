@@ -17,6 +17,7 @@ No Electron, no bloat. Export to PDF / ultra-long PNG / standalone HTML.
 - **Export** — A4 paginated PDF with narrow margins (`⌘E`), ultra-long PNG with auto-stitching (`⇧⌘E`), standalone HTML (`⌘H`)
 - **Live reload** — auto re-renders when the file changes on disk
 - **Multi-window** — each file in its own window; drag & drop supported
+- **History** — recent files in File ▸ Open Recent + quick links on the empty window (zero startup cost)
 - **Themes** — follows system, or force light/dark (`⌘T`); adjustable font size (`⌘+`/`⌘-`/`⌘0`)
 - **Set as default** — one command to make QuickMD the default `.md` opener
 
@@ -51,6 +52,7 @@ To revert: right-click any `.md` → Get Info → Open with → choose your app 
 | Action | How |
 |---|---|
 | Open | Double-click `.md` / drag into window / `⌘O` |
+| Recent | File ▸ Open Recent / empty-window quick links |
 | Reload | `⌘R` (also auto-reloads on external change) |
 | Export PDF / PNG / HTML | Toolbar or `⌘E` / `⇧⌘E` / `⌘H` |
 | Font size | `⌘+` / `⌘-` / `⌘0` |
@@ -83,7 +85,7 @@ Examples/排版测试.md         # Sample file to try rendering
 
 ## Windows 版 🪟
 
-同思路、同布局的 Windows 版本：C# WinForms + WebView2（Edge 内核），渲染内核与 mac 版同源，功能对齐（秒开、导出 PDF/长图/HTML、自动重载、主题字号、设为默认打开）。
+同思路、同布局的 Windows 版本：C# WinForms + WebView2（Edge 内核），渲染内核与 mac 版同源，功能对齐（秒开、导出 PDF/长图/HTML、自动重载、主题字号、历史记录、设为默认打开）。
 
 **下载**：[Releases](https://github.com/lucky9peach/QuickMD/releases) → `QuickMD.exe`（单文件，Win10/11 双击即用，需系统自带 WebView2 Runtime，新系统一般都有）。
 

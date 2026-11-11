@@ -64,6 +64,7 @@ sealed class PrefsData
 {
     public int FontSize { get; set; } = 16;
     public string Theme { get; set; } = "auto";
+    public List<string> RecentFiles { get; set; } = new();
 }
 
 // 偏好：%AppData%/QuickMD/settings.json（对标 mac 版 UserDefaults）
@@ -94,6 +95,41 @@ static class Prefs
     {
         get => _d.Theme is "light" or "dark" ? _d.Theme : "auto";
         set { _d.Theme = value; Save(); }
+    }
+
+    // ---- 历史记录（settings.json 启动时已读入内存，读零开销） ----
+    public static List<string> GetRecent(int limit = 12)
+    {
+        var l = _d.RecentFiles ?? new List<string>();
+        return l.Take(limit).ToList();
+    }
+
+    public static void AddRecent(string path)
+    {
+        _d.RecentFiles ??= new List<string>();
+        _d.RecentFiles.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        _d.RecentFiles.Insert(0, path);
+        if (_d.RecentFiles.Count > 12) _d.RecentFiles.RemoveRange(12, _d.RecentFiles.Count - 12);
+        Save();
+    }
+
+    public static void RemoveRecent(string path)
+    {
+        if (_d.RecentFiles == null) return;
+        _d.RecentFiles.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        Save();
+    }
+
+    public static void ClearRecent()
+    {
+        _d.RecentFiles = new List<string>();
+        Save();
+    }
+
+    public static void PruneMissing()
+    {
+        if (_d.RecentFiles == null || _d.RecentFiles.Count == 0) return;
+        if (_d.RecentFiles.RemoveAll(p => !File.Exists(p)) > 0) Save();
     }
 
     static void Save()
